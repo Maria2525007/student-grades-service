@@ -1,6 +1,5 @@
 from fastapi import Request
-import asyncpg
 
 
-async def get_pool(request: Request) -> asyncpg.Pool:
+async def get_pool(request: Request):
     return request.app.state.pool

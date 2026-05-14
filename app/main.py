@@ -13,7 +13,7 @@ async def lifespan(app: FastAPI):
     await app.state.pool.close()
 
 
-app = FastAPI(title="Student Grades Service", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Student Grades Service", lifespan=lifespan)
 
 app.include_router(upload.router)
 app.include_router(students.router)
