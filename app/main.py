@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.database import create_pool
-from app.routers import upload
+from app.routers import upload, students
 
 
 @asynccontextmanager
@@ -13,6 +13,7 @@ async def lifespan(app: FastAPI):
     await app.state.pool.close()
 
 
-app = FastAPI(title="Student Grades Service", lifespan=lifespan)
+app = FastAPI(title="Student Grades Service", version="1.0.0", lifespan=lifespan)
 
 app.include_router(upload.router)
+app.include_router(students.router)
