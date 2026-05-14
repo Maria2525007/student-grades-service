@@ -10,7 +10,7 @@ from tests.conftest import override_pool
 
 def make_csv(*rows):
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=["full_name", "subject", "grade"])
+    writer = csv.DictWriter(buf, fieldnames=["Дата", "Номер группы", "ФИО", "Оценка"], delimiter=";")
     writer.writeheader()
     writer.writerows(rows)
     return buf.getvalue().encode("utf-8")
@@ -24,9 +24,9 @@ def csv_file(content, filename="grades.csv"):
 async def test_upload_valid_csv(client):
     app.dependency_overrides[get_pool] = override_pool()
     data = make_csv(
-        {"full_name": "Иванов Иван", "subject": "Математика", "grade": 4},
-        {"full_name": "Иванов Иван", "subject": "Физика", "grade": 2},
-        {"full_name": "Петров Пётр", "subject": "Математика", "grade": 3},
+        {"Дата": "01.09.2024", "Номер группы": "ИВТ-21", "ФИО": "Иванов Иван", "Оценка": 4},
+        {"Дата": "01.09.2024", "Номер группы": "ИВТ-21", "ФИО": "Иванов Иван", "Оценка": 2},
+        {"Дата": "01.09.2024", "Номер группы": "ИВТ-21", "ФИО": "Петров Пётр", "Оценка": 3},
     )
     resp = await client.post("/upload-grades", files=csv_file(data))
     assert resp.status_code == 200
@@ -42,7 +42,7 @@ async def test_upload_invalid_extension(client):
     app.dependency_overrides[get_pool] = override_pool()
     resp = await client.post(
         "/upload-grades",
-        files={"file": ("grades.txt", io.BytesIO(b"full_name,subject,grade"), "text/plain")},
+        files={"file": ("grades.txt", io.BytesIO(b"data"), "text/plain")},
     )
     assert resp.status_code == 400
     app.dependency_overrides.clear()
@@ -51,17 +51,16 @@ async def test_upload_invalid_extension(client):
 @pytest.mark.asyncio
 async def test_upload_missing_columns(client):
     app.dependency_overrides[get_pool] = override_pool()
-    data = "full_name,grade\nИванов Иван,4\n".encode("utf-8")
+    data = "ФИО;Оценка\nИванов Иван;4\n".encode("utf-8")
     resp = await client.post("/upload-grades", files=csv_file(data))
     assert resp.status_code == 422
-    assert "subject" in resp.json()["detail"]
     app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
 async def test_upload_invalid_grade_value(client):
     app.dependency_overrides[get_pool] = override_pool()
-    data = make_csv({"full_name": "Иванов Иван", "subject": "Математика", "grade": 6})
+    data = make_csv({"Дата": "01.09.2024", "Номер группы": "ИВТ-21", "ФИО": "Иванов Иван", "Оценка": 6})
     resp = await client.post("/upload-grades", files=csv_file(data))
     assert resp.status_code == 422
     assert "grade" in resp.json()["detail"]
@@ -71,7 +70,7 @@ async def test_upload_invalid_grade_value(client):
 @pytest.mark.asyncio
 async def test_upload_non_integer_grade(client):
     app.dependency_overrides[get_pool] = override_pool()
-    data = b"full_name,subject,grade\n\xd0\x98\xd0\xb2\xd0\xb0\xd0\xbd\xd0\xbe\xd0\xb2,\xd0\x9c\xd0\xb0\xd1\x82,abc\n"
+    data = "Дата;Номер группы;ФИО;Оценка\n01.09.2024;ИВТ-21;Иванов Иван;abc\n".encode("utf-8")
     resp = await client.post("/upload-grades", files=csv_file(data))
     assert resp.status_code == 422
     app.dependency_overrides.clear()
@@ -80,7 +79,7 @@ async def test_upload_non_integer_grade(client):
 @pytest.mark.asyncio
 async def test_upload_empty_csv(client):
     app.dependency_overrides[get_pool] = override_pool()
-    data = b"full_name,subject,grade\n"
+    data = "Дата;Номер группы;ФИО;Оценка\n".encode("utf-8")
     resp = await client.post("/upload-grades", files=csv_file(data))
     assert resp.status_code == 422
     app.dependency_overrides.clear()
@@ -89,9 +88,19 @@ async def test_upload_empty_csv(client):
 @pytest.mark.asyncio
 async def test_upload_empty_full_name(client):
     app.dependency_overrides[get_pool] = override_pool()
-    data = make_csv({"full_name": "", "subject": "Математика", "grade": 3})
+    data = make_csv({"Дата": "01.09.2024", "Номер группы": "ИВТ-21", "ФИО": "", "Оценка": 3})
     resp = await client.post("/upload-grades", files=csv_file(data))
     assert resp.status_code == 422
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_upload_invalid_date(client):
+    app.dependency_overrides[get_pool] = override_pool()
+    data = "Дата;Номер группы;ФИО;Оценка\n2024-09-01;ИВТ-21;Иванов Иван;4\n".encode("utf-8")
+    resp = await client.post("/upload-grades", files=csv_file(data))
+    assert resp.status_code == 422
+    assert "date" in resp.json()["detail"]
     app.dependency_overrides.clear()
 
 

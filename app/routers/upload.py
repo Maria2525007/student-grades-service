@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
@@ -7,7 +8,7 @@ from app.dependencies import get_pool
 
 router = APIRouter()
 
-REQUIRED_COLUMNS = {"full_name", "subject", "grade"}
+REQUIRED_COLUMNS = {"ФИО", "Оценка", "Номер группы", "Дата"}
 VALID_GRADES = {1, 2, 3, 4, 5}
 
 
@@ -28,7 +29,7 @@ async def upload_grades(file: UploadFile = File(...), pool=Depends(get_pool)):
     content = await file.read()
     text = _decode(content)
 
-    reader = csv.DictReader(io.StringIO(text))
+    reader = csv.DictReader(io.StringIO(text), delimiter=";")
     if not REQUIRED_COLUMNS.issubset(set(reader.fieldnames or [])):
         missing = REQUIRED_COLUMNS - set(reader.fieldnames or [])
         raise HTTPException(
@@ -38,14 +39,15 @@ async def upload_grades(file: UploadFile = File(...), pool=Depends(get_pool)):
 
     rows = []
     for line_no, row in enumerate(reader, start=2):
-        full_name = (row.get("full_name") or "").strip()
-        subject = (row.get("subject") or "").strip()
-        grade_raw = (row.get("grade") or "").strip()
+        full_name = (row.get("ФИО") or "").strip()
+        group_number = (row.get("Номер группы") or "").strip()
+        grade_raw = (row.get("Оценка") or "").strip()
+        date_raw = (row.get("Дата") or "").strip()
 
         if not full_name:
-            raise HTTPException(status_code=422, detail=f"Row {line_no}: full_name is empty")
-        if not subject:
-            raise HTTPException(status_code=422, detail=f"Row {line_no}: subject is empty")
+            raise HTTPException(status_code=422, detail=f"Row {line_no}: ФИО is empty")
+        if not group_number:
+            raise HTTPException(status_code=422, detail=f"Row {line_no}: Номер группы is empty")
 
         try:
             grade = int(grade_raw)
@@ -61,7 +63,15 @@ async def upload_grades(file: UploadFile = File(...), pool=Depends(get_pool)):
                 detail=f"Row {line_no}: grade must be between 1 and 5, got {grade}",
             )
 
-        rows.append((full_name, subject, grade))
+        try:
+            grade_date = datetime.strptime(date_raw, "%d.%m.%Y").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Row {line_no}: invalid date format '{date_raw}', expected DD.MM.YYYY",
+            )
+
+        rows.append((full_name, group_number, grade, grade_date))
 
     if not rows:
         raise HTTPException(status_code=422, detail="CSV file contains no data rows")
@@ -80,8 +90,8 @@ async def upload_grades(file: UploadFile = File(...), pool=Depends(get_pool)):
 
             await conn.executemany(
                 """
-                INSERT INTO grades (student_id, subject, grade)
-                SELECT s.id, $2, $3
+                INSERT INTO grades (student_id, group_number, grade, grade_date)
+                SELECT s.id, $2, $3, $4
                 FROM students s
                 WHERE s.full_name = $1
                 """,
