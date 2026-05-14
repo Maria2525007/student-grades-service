@@ -46,7 +46,7 @@ Swagger UI: `http://localhost:8000/docs`
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -54,7 +54,6 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Отредактируйте .env, указав реальный DATABASE_URL
 ```
 
 ### 3. Применить миграции
@@ -113,8 +112,6 @@ curl http://localhost:8000/students/less-than-5-twos
 
 ## Запуск тестов
 
-Тесты не требуют запущенной БД — используются фиктивные объекты пула соединений.
-
 ```bash
 pytest -v
 ```
@@ -122,8 +119,6 @@ pytest -v
 ## Схема базы данных
 
 ```sql
--- migrations/001_create_tables.sql
-
 CREATE TABLE students (
     id        SERIAL PRIMARY KEY,
     full_name VARCHAR(255) NOT NULL UNIQUE
